@@ -7,9 +7,10 @@ import ai.pipestream.engine.v1.IntakeHandoffResponse;
 import ai.pipestream.engine.v1.MutinyEngineV1ServiceGrpc;
 import ai.pipestream.engine.v1.ProcessNodeRequest;
 import ai.pipestream.engine.v1.ProcessNodeResponse;
-import io.quarkus.grpc.GrpcClient;
+import ai.pipestream.sidecar.grpc.SidecarGrpcClientFactory;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 /**
@@ -26,8 +27,8 @@ public class EngineClient {
 
     private static final Logger LOG = Logger.getLogger(EngineClient.class);
 
-    @GrpcClient("engine")
-    MutinyEngineV1ServiceGrpc.MutinyEngineV1ServiceStub engineClient;
+    @Inject
+    SidecarGrpcClientFactory clientFactory;
 
     /**
      * Hands off a document from an intake topic to the Engine.
@@ -55,12 +56,14 @@ public class EngineClient {
             ? hydratedDoc.getOwnership().getAccountId()
             : "";
 
-        return engineClient.intakeHandoff(
-                IntakeHandoffRequest.newBuilder()
-                    .setStream(stream)
-                    .setDatasourceId(datasourceId)
-                    .setAccountId(accountId)
-                    .build())
+        IntakeHandoffRequest request = IntakeHandoffRequest.newBuilder()
+                .setStream(stream)
+                .setDatasourceId(datasourceId)
+                .setAccountId(accountId)
+                .build();
+
+        return clientFactory.engine()
+            .flatMap(stub -> stub.intakeHandoff(request))
             .invoke(response -> {
                 if (response.getAccepted()) {
                     LOG.infof("Intake handoff accepted for doc %s, streamId=%s, entryNode=%s",
@@ -99,10 +102,12 @@ public class EngineClient {
             .setCurrentNodeId(targetNodeId)
             .build();
 
-        return engineClient.processNode(
-                ProcessNodeRequest.newBuilder()
-                    .setStream(stream)
-                    .build())
+        ProcessNodeRequest request = ProcessNodeRequest.newBuilder()
+                .setStream(stream)
+                .build();
+
+        return clientFactory.engine()
+            .flatMap(stub -> stub.processNode(request))
             .invoke(response -> {
                 if (response.getSuccess()) {
                     LOG.infof("ProcessNode succeeded for doc %s at node %s",

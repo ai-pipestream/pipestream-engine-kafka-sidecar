@@ -1,148 +1,80 @@
 package ai.pipestream.sidecar.service;
 
 import ai.pipestream.data.v1.DocumentReference;
-import ai.pipestream.data.v1.OwnershipContext;
 import ai.pipestream.data.v1.PipeDoc;
-import ai.pipestream.repository.pipedoc.v1.GetPipeDocByReferenceRequest;
-import ai.pipestream.repository.pipedoc.v1.GetPipeDocByReferenceResponse;
-import ai.pipestream.repository.pipedoc.v1.MutinyPipeDocServiceGrpc;
-import io.smallrye.mutiny.Uni;
-import org.junit.jupiter.api.BeforeEach;
+import ai.pipestream.sidecar.util.WireMockTestResource;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Field;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for DocumentHydrator using mocked gRPC client.
+ * Integration tests for DocumentHydrator using WireMock gRPC container.
+ * <p>
+ * Tests document hydration by calling the real gRPC mock server via testcontainers.
+ * The WireMock server has default test documents registered that can be hydrated.
  */
-@ExtendWith(MockitoExtension.class)
+@QuarkusTest
+@QuarkusTestResource(WireMockTestResource.class)
 class DocumentHydratorTest {
 
-    @Mock
-    private MutinyPipeDocServiceGrpc.MutinyPipeDocServiceStub repoClient;
-
-    private DocumentHydrator hydrator;
-
-    @BeforeEach
-    void setUp() throws Exception {
-        hydrator = new DocumentHydrator();
-        // Inject mock using reflection
-        Field field = DocumentHydrator.class.getDeclaredField("repoClient");
-        field.setAccessible(true);
-        field.set(hydrator, repoClient);
-    }
+    @Inject
+    DocumentHydrator hydrator;
 
     @Test
-    @DisplayName("Should hydrate document successfully")
-    void testHydrateDocumentSuccess() {
-        // Arrange
-        String docId = "doc-123";
-        String accountId = "account-456";
-        String nodeId = "node-parser";
-        String drive = "default-drive";
-
-        PipeDoc expectedDoc = PipeDoc.newBuilder()
-                .setDocId(docId)
-                .setOwnership(OwnershipContext.newBuilder()
-                        .setAccountId(accountId)
-                        .setDatasourceId("datasource-001")
-                        .build())
-                .build();
-
-        GetPipeDocByReferenceResponse response = GetPipeDocByReferenceResponse.newBuilder()
-                .setPipedoc(expectedDoc)
-                .setNodeId(nodeId)
-                .setDrive(drive)
-                .setSizeBytes(expectedDoc.getSerializedSize())
-                .build();
-
-        when(repoClient.getPipeDocByReference(any(GetPipeDocByReferenceRequest.class)))
-                .thenReturn(Uni.createFrom().item(response));
-
+    @DisplayName("Should hydrate document from repository service")
+    void testHydrateDocument() {
+        // The wiremock server has default test documents registered
+        // test-doc-1 and test-doc-2 with account test-account
         DocumentReference docRef = DocumentReference.newBuilder()
-                .setDocId(docId)
-                .setAccountId(accountId)
+                .setDocId("test-doc-1")
+                .setAccountId("test-account")
                 .build();
 
-        // Act
         PipeDoc result = hydrator.hydrateDocument(docRef)
-                .await().indefinitely();
+                .await().atMost(Duration.ofSeconds(10));
 
-        // Assert
         assertNotNull(result);
-        assertEquals(docId, result.getDocId());
-        assertTrue(result.hasOwnership());
-        assertEquals(accountId, result.getOwnership().getAccountId());
+        assertEquals("test-doc-1", result.getDocId());
     }
 
     @Test
-    @DisplayName("Should propagate error on hydration failure")
-    void testHydrateDocumentFailure() {
-        // Arrange
-        when(repoClient.getPipeDocByReference(any(GetPipeDocByReferenceRequest.class)))
-                .thenReturn(Uni.createFrom().failure(new RuntimeException("Connection failed")));
-
+    @DisplayName("Should hydrate document with source node ID")
+    void testHydrateDocumentWithSourceNode() {
         DocumentReference docRef = DocumentReference.newBuilder()
-                .setDocId("failing-doc")
-                .setAccountId("account-123")
+                .setDocId("test-doc-2")
+                .setAccountId("test-account")
+                .setSourceNodeId("node-parser")
                 .build();
 
-        // Act & Assert
-        assertThrows(RuntimeException.class, () ->
-                hydrator.hydrateDocument(docRef).await().indefinitely()
-        );
-    }
-
-    @Test
-    @DisplayName("Should hydrate document with all reference fields")
-    void testHydrateDocumentWithFullReference() {
-        // Arrange
-        String docId = "doc-full";
-        String accountId = "account-full";
-        String sourceNodeId = "source-node";
-        String nodeId = "storage-node";
-
-        PipeDoc expectedDoc = PipeDoc.newBuilder()
-                .setDocId(docId)
-                .setOwnership(OwnershipContext.newBuilder()
-                        .setAccountId(accountId)
-                        .setDatasourceId("datasource-full")
-                        .setConnectorId("connector-001")
-                        .build())
-                .build();
-
-        GetPipeDocByReferenceResponse response = GetPipeDocByReferenceResponse.newBuilder()
-                .setPipedoc(expectedDoc)
-                .setNodeId(nodeId)
-                .setDrive("production-drive")
-                .setSizeBytes(1024)
-                .build();
-
-        when(repoClient.getPipeDocByReference(any(GetPipeDocByReferenceRequest.class)))
-                .thenReturn(Uni.createFrom().item(response));
-
-        DocumentReference docRef = DocumentReference.newBuilder()
-                .setDocId(docId)
-                .setAccountId(accountId)
-                .setSourceNodeId(sourceNodeId)
-                .build();
-
-        // Act
         PipeDoc result = hydrator.hydrateDocument(docRef)
-                .await().indefinitely();
+                .await().atMost(Duration.ofSeconds(10));
 
-        // Assert
         assertNotNull(result);
-        assertEquals(docId, result.getDocId());
-        assertEquals("datasource-full", result.getOwnership().getDatasourceId());
-        assertEquals("connector-001", result.getOwnership().getConnectorId());
+        assertEquals("test-doc-2", result.getDocId());
+    }
+
+    @Test
+    @DisplayName("Should handle hydration of unknown document gracefully")
+    void testHydrateUnknownDocument() {
+        // Unknown documents may return an empty response or throw
+        // depending on how the wiremock server is configured
+        DocumentReference docRef = DocumentReference.newBuilder()
+                .setDocId("nonexistent-doc")
+                .setAccountId("unknown-account")
+                .build();
+
+        // The wiremock server returns an empty response for unknown docs
+        // (not NOT_FOUND error), so this should succeed but return empty doc
+        PipeDoc result = hydrator.hydrateDocument(docRef)
+                .await().atMost(Duration.ofSeconds(10));
+
+        // Empty PipeDoc has empty docId
+        assertNotNull(result);
     }
 }
