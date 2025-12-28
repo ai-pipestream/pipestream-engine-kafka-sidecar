@@ -1,0 +1,46 @@
+####
+# This Dockerfile is used in order to build a container that runs the Quarkus application in JVM mode
+#
+# Before building the container image run:
+#
+# ./gradlew build
+#
+# Then, build the image with:
+#
+# docker build -f src/main/docker/Dockerfile.jvm -t quarkus/pipestream-engine-kafka-sidecar-jvm .
+#
+# Then run the container using:
+#
+# docker run -i --rm -p 38104:38104 quarkus/pipestream-engine-kafka-sidecar-jvm
+#
+# This image uses the `run-java.sh` script to run the application.
+###
+FROM registry.access.redhat.com/ubi9-minimal:9.5
+
+# Install Java 21 runtime (headless for smaller size) and update CVEs
+RUN microdnf install -y \
+    java-21-openjdk-headless \
+    ca-certificates \
+    && microdnf update -y \
+    && microdnf clean all \
+    && rm -rf /var/cache/yum
+
+ENV LANGUAGE='en_US:en'
+
+# We make four distinct layers so if there are application changes the library layers can be re-used
+COPY --chown=185 build/quarkus-app/lib/ /deployments/lib/
+COPY --chown=185 build/quarkus-app/*.jar /deployments/
+COPY --chown=185 build/quarkus-app/app/ /deployments/app/
+COPY --chown=185 build/quarkus-app/quarkus/ /deployments/quarkus/
+
+EXPOSE 38104
+USER 185
+
+# Health check using Quarkus health endpoint
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:38104/q/health || exit 1
+
+ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"
+
+ENTRYPOINT ["java", "-jar", "/deployments/quarkus-run.jar"]

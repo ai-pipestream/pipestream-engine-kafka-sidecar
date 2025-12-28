@@ -1,0 +1,20 @@
+name: Build and Publish
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-publish:
+    uses: ai-pipestream/.github/.github/workflows/reusable-service-build.yml@main
+    with:
+      docker-image-name: pipestream-engine-kafka-sidecar
+      dockerfile-path: src/main/docker/Dockerfile.jvm
+    secrets:
+      BUF_TOKEN: ${{ secrets.BUF_TOKEN }}
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+      MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
