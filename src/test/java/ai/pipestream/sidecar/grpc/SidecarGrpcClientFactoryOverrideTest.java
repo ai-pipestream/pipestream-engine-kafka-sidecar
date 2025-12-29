@@ -7,6 +7,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
@@ -19,9 +20,9 @@ class SidecarGrpcClientFactoryOverrideTest {
     @Test
     @DisplayName("Should use test override SidecarGrpcClientFactory during @QuarkusTest")
     void usesTestFactoryOverride() {
-        assertTrue(factory instanceof TestSidecarGrpcClientFactory,
-                "Expected TestSidecarGrpcClientFactory to be selected during tests");
+        assertInstanceOf(TestSidecarGrpcClientFactory.class, factory, "Expected TestSidecarGrpcClientFactory to be selected during tests");
     }
 }
+
 
 

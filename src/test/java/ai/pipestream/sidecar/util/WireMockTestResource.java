@@ -44,7 +44,7 @@ public class WireMockTestResource implements QuarkusTestResourceLifecycleManager
 
         String image = System.getenv().getOrDefault(
                 "WIREMOCK_IMAGE",
-                "docker.io/pipestreamai/pipestream-wiremock-server:0.1.26"
+                "docker.io/pipestreamai/pipestream-wiremock-server:0.1.27"
         );
 
         wireMockContainer = new GenericContainer<>(

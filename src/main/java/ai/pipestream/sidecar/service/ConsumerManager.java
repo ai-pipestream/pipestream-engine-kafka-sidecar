@@ -18,6 +18,7 @@ import org.apache.kafka.common.serialization.UUIDDeserializer;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -58,6 +59,18 @@ public class ConsumerManager {
     @ConfigProperty(name = "pipestream.sidecar.consumer-group", defaultValue = "pipestream-sidecar")
     String consumerGroupId;
 
+    @ConfigProperty(name = "pipestream.sidecar.consumer.enabled", defaultValue = "true")
+    boolean consumerEnabled;
+
+    @ConfigProperty(name = "pipestream.sidecar.processing.max-retries", defaultValue = "3")
+    int processingMaxRetries;
+
+    @ConfigProperty(name = "pipestream.sidecar.processing.backoff.initial-ms", defaultValue = "25")
+    long processingBackoffInitialMs;
+
+    @ConfigProperty(name = "pipestream.sidecar.processing.backoff.max-ms", defaultValue = "250")
+    long processingBackoffMaxMs;
+
     /** Single consumer instance that subscribes to multiple topics */
     private KafkaConsumer<UUID, PipeStream> consumer;
 
@@ -66,6 +79,10 @@ public class ConsumerManager {
 
     void onStart(@Observes StartupEvent ev) {
         LOG.info("Initializing ConsumerManager...");
+        if (!consumerEnabled) {
+            LOG.info("pipestream.sidecar.consumer.enabled=false; skipping Kafka consumer startup.");
+            return;
+        }
         createConsumer();
     }
 
@@ -184,33 +201,65 @@ public class ConsumerManager {
         LOG.debugf("Processing document reference: docId=%s, sourceNodeId=%s, accountId=%s",
                 docRef.getDocId(), docRef.getSourceNodeId(), docRef.getAccountId());
 
-        // Hydrate the document
-        documentHydrator.hydrateDocument(docRef)
-            .onItem().transformToUni(hydratedDoc -> {
-                // Validate
-                if (!requestValidator.validate(hydratedDoc)) {
-                    LOG.warnf("Document %s validation failed, skipping", hydratedDoc.getDocId());
-                    return Uni.createFrom().voidItem();
-                }
-
-                // Route to appropriate Engine endpoint based on topic type
-                return routeToEngine(pipeStream, hydratedDoc, topicType, topic);
-            })
-            .subscribe().with(
-                success -> {
-                    LOG.debugf("Successfully processed document from topic %s", topic);
-                    commitOffset(record);
-                },
-                failure -> {
-                    LOG.errorf(failure, "Error processing document %s from topic %s",
-                              docRef.getDocId(), topic);
-                    // TODO: DLQ publishing (Issue #3 Phase 2)
-                    // For now, commit to avoid infinite retry loop
-                    commitOffset(record);
-                }
-            );
+        processPipeStream(pipeStream, topicType, topic)
+                .subscribe().with(
+                        ignored -> {
+                            LOG.debugf("Successfully processed document from topic %s", topic);
+                            commitOffset(record);
+                        },
+                        failure -> {
+                            LOG.errorf(failure, "Error processing document %s from topic %s",
+                                    docRef.getDocId(), topic);
+                            // TODO: DLQ publishing (Issue #3 Phase 2)
+                            // For now, commit to avoid infinite retry loop
+                            commitOffset(record);
+                        }
+                );
     }
 
+
+
+    /**
+     * Process a PipeStream through hydration -> validation -> engine routing, with retry/backoff for transient failures.
+     * <p>
+     * Split out so we can test the processing + retry policy without requiring a Kafka broker.
+     */
+    Uni<Void> processPipeStream(PipeStream pipeStream, TopicType topicType, String topic) {
+        if (!pipeStream.hasDocumentRef()) {
+            return Uni.createFrom().voidItem();
+        }
+
+        DocumentReference docRef = pipeStream.getDocumentRef();
+
+        return documentHydrator.hydrateDocument(docRef)
+                .onItem().transformToUni(hydratedDoc -> {
+                    if (!requestValidator.validate(hydratedDoc)) {
+                        LOG.warnf("Document %s validation failed, skipping", hydratedDoc.getDocId());
+                        return Uni.createFrom().voidItem();
+                    }
+                    return routeToEngine(pipeStream, hydratedDoc, topicType, topic);
+                })
+                .replaceWithVoid()
+                // FR7: transient failures should be retried with backoff (DLQ later in the loop).
+                .onFailure(this::isRetryableProcessingFailure)
+                .retry()
+                .withBackOff(Duration.ofMillis(processingBackoffInitialMs), Duration.ofMillis(processingBackoffMaxMs))
+                .atMost(processingMaxRetries)
+                .onFailure().invoke(err ->
+                        LOG.errorf(err, "Processing failed after retries: docId=%s, topic=%s", docRef.getDocId(), topic)
+                );
+    }
+
+    private boolean isRetryableProcessingFailure(Throwable t) {
+        if (t instanceof io.grpc.StatusRuntimeException sre) {
+            io.grpc.Status.Code code = sre.getStatus().getCode();
+            return code == io.grpc.Status.Code.UNAVAILABLE
+                    || code == io.grpc.Status.Code.DEADLINE_EXCEEDED
+                    || code == io.grpc.Status.Code.RESOURCE_EXHAUSTED
+                    || code == io.grpc.Status.Code.ABORTED;
+        }
+        return false;
+    }
     /**
      * Routes a hydrated document to the appropriate Engine endpoint.
      *

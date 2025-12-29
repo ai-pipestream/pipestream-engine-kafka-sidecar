@@ -12,7 +12,7 @@ import java.util.Map;
 
 /**
  * In-process WireMock gRPC server for tests that need fine-grained stub control (e.g. fail-once-then-success).
- *
+ * <p>
  * This avoids Docker/testcontainers and lets tests register scenario-based stubs.
  */
 public class InProcessGrpcWireMockTestResource implements QuarkusTestResourceLifecycleManager {
@@ -61,5 +61,6 @@ public class InProcessGrpcWireMockTestResource implements QuarkusTestResourceLif
         }
     }
 }
+
 
 

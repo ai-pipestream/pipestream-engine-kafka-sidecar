@@ -6,7 +6,7 @@ import io.smallrye.mutiny.Uni;
 
 /**
  * Central factory for gRPC stubs used by the sidecar.
- *
+ * <p>
  * This gives us a single override point for tests (e.g. to force WireMock host/port or a different channel impl),
  * while production can resolve via DynamicGrpc/Consul/Stork as desired.
  */
@@ -15,5 +15,6 @@ public interface SidecarGrpcClientFactory {
 
     Uni<MutinyPipeDocServiceGrpc.MutinyPipeDocServiceStub> repo();
 }
+
 
 
