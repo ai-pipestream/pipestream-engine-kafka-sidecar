@@ -11,7 +11,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.eclipse.microprofile.config.ConfigProvider;
 
 import java.time.Duration;
 
@@ -37,16 +36,6 @@ class EngineClientTest {
     @Test
     @DisplayName("Should successfully handoff intake document")
     void testIntakeHandoffSuccess() {
-        // Diagnostic: print the resolved gRPC/Stork configuration used by this test run.
-        // This helps confirm whether the injected @GrpcClient("engine") is expected to use WireMock’s mapped port.
-        var cfg = ConfigProvider.getConfig();
-        System.out.println("DIAG quarkus.grpc.clients.engine.host=" +
-                cfg.getOptionalValue("quarkus.grpc.clients.engine.host", String.class).orElse("<unset>"));
-        System.out.println("DIAG quarkus.grpc.clients.engine.port=" +
-                cfg.getOptionalValue("quarkus.grpc.clients.engine.port", String.class).orElse("<unset>"));
-        System.out.println("DIAG stork.engine.service-discovery.address-list=" +
-                cfg.getOptionalValue("stork.engine.service-discovery.address-list", String.class).orElse("<unset>"));
-
         PipeDoc doc = createTestDoc("intake-doc-1", "test-account", "datasource-1");
         PipeStream stream = PipeStream.newBuilder()
                 .setStreamId("original-stream-id")
