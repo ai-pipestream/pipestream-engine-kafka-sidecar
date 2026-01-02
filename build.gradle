@@ -37,6 +37,7 @@ pipestreamProtos {
         register("config")
         register("repo")
         register("pipeline-module")
+        register("engine-kafka-sidecar")
     }
 }
 
