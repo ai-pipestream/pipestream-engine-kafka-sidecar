@@ -15,6 +15,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.UUIDDeserializer;
+import org.eclipse.microprofile.config.ConfigProvider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Manages Kafka consumers for dynamically assigned topics.
@@ -52,10 +54,6 @@ public class ConsumerManager {
     @ConfigProperty(name = "kafka.bootstrap.servers")
     String bootstrapServers;
 
-    @ConfigProperty(name = "mp.messaging.connector.smallrye-kafka.apicurio.registry.url",
-                    defaultValue = "http://localhost:8081/apis/registry/v3")
-    String registryUrl;
-
     @ConfigProperty(name = "pipestream.sidecar.consumer-group", defaultValue = "pipestream-sidecar")
     String consumerGroupId;
 
@@ -76,9 +74,21 @@ public class ConsumerManager {
 
     /** Currently subscribed topics with their types */
     private final ConcurrentHashMap<String, TopicType> subscribedTopics = new ConcurrentHashMap<>();
+    
+    /** Track paused topics */
+    private final Set<String> pausedTopics = ConcurrentHashMap.newKeySet();
 
     void onStart(@Observes StartupEvent ev) {
         LOG.info("Initializing ConsumerManager...");
+        
+        // Log gRPC configuration for debugging health checks
+        var config = ConfigProvider.getConfig();
+        boolean useSeparateServer = config.getOptionalValue("quarkus.grpc.server.use-separate-server", Boolean.class).orElse(true);
+        boolean healthServiceEnabled = config.getOptionalValue("quarkus.grpc.server.enable-health-service", Boolean.class).orElse(false);
+        int httpPort = config.getOptionalValue("quarkus.http.port", Integer.class).orElse(8080);
+        LOG.infof("gRPC Configuration - use-separate-server: %s, enable-health-service: %s, HTTP port: %d", 
+                useSeparateServer, healthServiceEnabled, httpPort);
+        
         if (!consumerEnabled) {
             LOG.info("pipestream.sidecar.consumer.enabled=false; skipping Kafka consumer startup.");
             return;
@@ -117,9 +127,91 @@ public class ConsumerManager {
      */
     public synchronized void removeTopic(String topicName) {
         if (subscribedTopics.remove(topicName) != null) {
+            pausedTopics.remove(topicName); // Clear paused state if removed
             updateSubscription();
             LOG.infof("Removed topic %s from subscriptions", topicName);
         }
+    }
+
+    /**
+     * Pauses consumption for a specific topic.
+     *
+     * @param topicName The topic to pause
+     */
+    public void pauseTopic(String topicName) {
+        if (!subscribedTopics.containsKey(topicName)) {
+            LOG.warnf("Cannot pause topic %s: not subscribed", topicName);
+            return;
+        }
+        
+        pausedTopics.add(topicName);
+        
+        if (consumer != null) {
+            consumer.assignment()
+                .map(partitions -> partitions.stream()
+                    .filter(tp -> tp.getTopic().equals(topicName))
+                    .collect(Collectors.toSet()))
+                .subscribe().with(
+                    partitionsToPause -> {
+                        if (!partitionsToPause.isEmpty()) {
+                            consumer.pause(partitionsToPause)
+                                .subscribe().with(
+                                    v -> LOG.infof("Paused consumer for topic %s", topicName),
+                                    e -> LOG.errorf(e, "Failed to pause topic %s", topicName)
+                                );
+                        }
+                    },
+                    e -> LOG.errorf(e, "Failed to get assignment for pausing topic %s", topicName)
+                );
+        }
+    }
+
+    /**
+     * Resumes consumption for a specific topic.
+     *
+     * @param topicName The topic to resume
+     */
+    public void resumeTopic(String topicName) {
+        if (!pausedTopics.remove(topicName)) {
+            LOG.debugf("Topic %s was not paused", topicName);
+            return;
+        }
+
+        if (consumer != null) {
+            consumer.assignment()
+                .map(partitions -> partitions.stream()
+                    .filter(tp -> tp.getTopic().equals(topicName))
+                    .collect(Collectors.toSet()))
+                .subscribe().with(
+                    partitionsToResume -> {
+                        if (!partitionsToResume.isEmpty()) {
+                            consumer.resume(partitionsToResume)
+                                .subscribe().with(
+                                    v -> LOG.infof("Resumed consumer for topic %s", topicName),
+                                    e -> LOG.errorf(e, "Failed to resume topic %s", topicName)
+                                );
+                        }
+                    },
+                    e -> LOG.errorf(e, "Failed to get assignment for resuming topic %s", topicName)
+                );
+        }
+    }
+
+    /**
+     * Returns the set of currently subscribed topics.
+     *
+     * @return Set of topic names
+     */
+    public Set<String> getSubscribedTopics() {
+        return new HashSet<>(subscribedTopics.keySet());
+    }
+    
+    public Map<String, TopicType> getSubscribedTopicsWithTypes() {
+        return new HashMap<>(subscribedTopics);
+    }
+    
+    public boolean isTopicPaused(String topic) {
+        return pausedTopics.contains(topic);
     }
 
     /**
@@ -151,6 +243,18 @@ public class ConsumerManager {
      * Creates the Kafka consumer configured for PipeStream messages.
      */
     private void createConsumer() {
+        // Resolve registry URL at runtime
+        // Priority: 1. Explicit config property, 2. Connector-level config, 3. Fail with clear error
+        String registryUrl = ConfigProvider.getConfig()
+                .getOptionalValue("apicurio.registry.url", String.class)
+                .orElseGet(() -> ConfigProvider.getConfig()
+                        .getOptionalValue("mp.messaging.connector.smallrye-kafka.apicurio.registry.url", String.class)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "apicurio.registry.url must be set. " +
+                                "For manual Kafka consumers, the Apicurio DevServices extension doesn't auto-detect the need. " +
+                                "In dev mode with Compose DevServices, set apicurio.registry.url in application.properties. " +
+                                "In production, set APICURIO_REGISTRY_URL environment variable.")));
+
         Map<String, String> config = new HashMap<>();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
@@ -160,12 +264,12 @@ public class ConsumerManager {
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
-        // Apicurio Registry configuration (using string keys directly)
+        // Apicurio Registry configuration - minimal required per docs
         config.put("apicurio.registry.url", registryUrl);
         config.put("apicurio.registry.auto-register", "true");
         config.put("apicurio.protobuf.derive.class", "true");
 
-        LOG.infof("Creating Kafka Consumer with group %s", consumerGroupId);
+        LOG.infof("Creating Kafka Consumer with group %s, registry: %s", consumerGroupId, registryUrl);
 
         consumer = KafkaConsumer.create(vertx, config);
         consumer.handler(this::handleRecord)
@@ -309,12 +413,4 @@ public class ConsumerManager {
             );
     }
 
-    /**
-     * Returns the set of currently subscribed topics.
-     *
-     * @return Set of topic names
-     */
-    public Set<String> getSubscribedTopics() {
-        return new HashSet<>(subscribedTopics.keySet());
-    }
 }
