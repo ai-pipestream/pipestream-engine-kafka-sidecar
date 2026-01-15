@@ -51,6 +51,9 @@ public class ConsumerManager {
     @Inject
     EngineClient engineClient;
 
+    @Inject
+    DlqProducer dlqProducer;
+
     @ConfigProperty(name = "kafka.bootstrap.servers")
     String bootstrapServers;
 
@@ -244,16 +247,14 @@ public class ConsumerManager {
      */
     private void createConsumer() {
         // Resolve registry URL at runtime
-        // Priority: 1. Explicit config property, 2. Connector-level config, 3. Fail with clear error
         String registryUrl = ConfigProvider.getConfig()
                 .getOptionalValue("apicurio.registry.url", String.class)
-                .orElseGet(() -> ConfigProvider.getConfig()
-                        .getOptionalValue("mp.messaging.connector.smallrye-kafka.apicurio.registry.url", String.class)
-                        .orElseThrow(() -> new IllegalStateException(
-                                "apicurio.registry.url must be set. " +
-                                "For manual Kafka consumers, the Apicurio DevServices extension doesn't auto-detect the need. " +
-                                "In dev mode with Compose DevServices, set apicurio.registry.url in application.properties. " +
-                                "In production, set APICURIO_REGISTRY_URL environment variable.")));
+                .or(() -> ConfigProvider.getConfig().getOptionalValue("mp.messaging.connector.smallrye-kafka.apicurio.registry.url", String.class))
+                .orElseThrow(() -> new IllegalStateException(
+                        "apicurio.registry.url must be set. " +
+                        "For manual Kafka consumers, the Apicurio DevServices extension doesn't auto-detect the need. " +
+                        "In dev mode with Compose DevServices, set apicurio.registry.url in application.properties. " +
+                        "In production, set APICURIO_REGISTRY_URL environment variable."));
 
         Map<String, String> config = new HashMap<>();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -283,7 +284,7 @@ public class ConsumerManager {
      *
      * @param record The consumed record containing a PipeStream
      */
-    private void handleRecord(KafkaConsumerRecord<UUID, PipeStream> record) {
+    void handleRecord(KafkaConsumerRecord<UUID, PipeStream> record) {
         String topic = record.topic();
         UUID key = record.key();
         PipeStream pipeStream = record.value();
@@ -306,17 +307,21 @@ public class ConsumerManager {
                 docRef.getDocId(), docRef.getSourceNodeId(), docRef.getAccountId());
 
         processPipeStream(pipeStream, topicType, topic)
+                .onFailure().recoverWithUni(failure -> {
+                    LOG.errorf(failure, "Error processing document %s from topic %s after retries. Sending to DLQ.",
+                            docRef.getDocId(), topic);
+                    return dlqProducer.sendToDlq(topic, record.key(), pipeStream, failure, 
+                            processingMaxRetries, record.partition(), record.offset());
+                })
                 .subscribe().with(
                         ignored -> {
-                            LOG.debugf("Successfully processed document from topic %s", topic);
+                            LOG.debugf("Successfully processed document (or sent to DLQ) from topic %s", topic);
                             commitOffset(record);
                         },
                         failure -> {
-                            LOG.errorf(failure, "Error processing document %s from topic %s",
-                                    docRef.getDocId(), topic);
-                            // TODO: DLQ publishing (Issue #3 Phase 2)
-                            // For now, commit to avoid infinite retry loop
-                            commitOffset(record);
+                            LOG.errorf(failure, "CRITICAL: Failed to process document AND failed to send to DLQ for topic %s. Offset will not be committed.",
+                                    topic);
+                            // Do NOT commit offset if both processing and DLQ failed
                         }
                 );
     }

@@ -66,6 +66,9 @@ public class ConsulLeaseManager {
     @ConfigProperty(name = "pipestream.sidecar.session-renew-interval-ms", defaultValue = "10000")
     long sessionRenewIntervalMs;
 
+    @ConfigProperty(name = "pipestream.registration.enabled", defaultValue = "true")
+    boolean registrationEnabled;
+
     private String sessionId;
     private long pollTimerId = -1;
     private long renewTimerId = -1;
@@ -93,6 +96,10 @@ public class ConsulLeaseManager {
     }
 
     void onStart(@Observes StartupEvent ev) {
+        if (!registrationEnabled) {
+            LOG.info("Registration disabled; skipping Consul Lease Manager startup.");
+            return;
+        }
         LOG.info("Starting Consul Lease Manager...");
         createSession()
             .subscribe().with(
