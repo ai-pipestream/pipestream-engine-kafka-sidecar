@@ -74,6 +74,7 @@ dependencies {
     implementation libs.commons.lang3
 
     // Testing
+    testImplementation platform("ai.pipestream:pipestream-bom:${pipestreamBomVersion}")
     testImplementation 'io.quarkus:quarkus-junit5'
     testImplementation 'io.rest-assured:rest-assured'
     testImplementation(testFixtures("ai.pipestream:pipestream-test-support"))
