@@ -4,7 +4,7 @@ import ai.pipestream.data.v1.DocumentReference;
 import ai.pipestream.data.v1.PipeStream;
 import ai.pipestream.engine.sidecar.v1.DlqMessage;
 import ai.pipestream.sidecar.service.ConsulLeaseManager.TopicType;
-import ai.pipestream.sidecar.util.WireMockTestResource;
+import ai.pipestream.test.support.SidecarWireMockTestResource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.Uni;
@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @QuarkusTest
-@QuarkusTestResource(WireMockTestResource.class)
+@QuarkusTestResource(SidecarWireMockTestResource.class)
 class DlqEndToEndTest {
 
     private static final Logger LOG = Logger.getLogger(DlqEndToEndTest.class);

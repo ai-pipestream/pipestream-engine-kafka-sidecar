@@ -4,6 +4,7 @@ import ai.pipestream.engine.v1.EngineV1ServiceGrpc;
 import ai.pipestream.engine.v1.IntakeHandoffRequest;
 import ai.pipestream.engine.v1.IntakeHandoffResponse;
 import ai.pipestream.data.v1.PipeStream;
+import ai.pipestream.test.support.SidecarWireMockTestResource;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.quarkus.test.common.QuarkusTestResource;
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Uses direct ManagedChannel to isolate from Quarkus gRPC client issues.
  */
 @QuarkusTest
-@QuarkusTestResource(WireMockTestResource.class)
+@QuarkusTestResource(SidecarWireMockTestResource.class)
 public class WireMockSanityTest {
 
     @Test

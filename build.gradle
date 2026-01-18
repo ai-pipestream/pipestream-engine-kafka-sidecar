@@ -76,6 +76,7 @@ dependencies {
     // Testing
     testImplementation 'io.quarkus:quarkus-junit5'
     testImplementation 'io.rest-assured:rest-assured'
+    testImplementation(testFixtures("ai.pipestream:pipestream-test-support"))
     // Testcontainers for running pipestream-wiremock-server as a container
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'

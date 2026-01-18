@@ -1,6 +1,6 @@
 package ai.pipestream.sidecar.grpc;
 
-import ai.pipestream.sidecar.util.WireMockTestResource;
+import ai.pipestream.test.support.SidecarWireMockTestResource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
-@QuarkusTestResource(WireMockTestResource.class)
+@QuarkusTestResource(SidecarWireMockTestResource.class)
 class SidecarGrpcClientFactoryOverrideTest {
 
     @Inject

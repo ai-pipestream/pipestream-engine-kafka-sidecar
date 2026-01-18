@@ -5,7 +5,7 @@ import ai.pipestream.data.v1.PipeDoc;
 import ai.pipestream.data.v1.PipeStream;
 import ai.pipestream.engine.v1.IntakeHandoffResponse;
 import ai.pipestream.engine.v1.ProcessNodeResponse;
-import ai.pipestream.sidecar.util.WireMockTestResource;
+import ai.pipestream.test.support.SidecarWireMockTestResource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * via testcontainers.
  */
 @QuarkusTest
-@QuarkusTestResource(WireMockTestResource.class)
+@QuarkusTestResource(SidecarWireMockTestResource.class)
 class EngineClientTest {
 
     @Inject

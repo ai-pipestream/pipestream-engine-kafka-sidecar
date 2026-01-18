@@ -2,7 +2,7 @@ package ai.pipestream.sidecar.service;
 
 import ai.pipestream.data.v1.DocumentReference;
 import ai.pipestream.data.v1.PipeDoc;
-import ai.pipestream.sidecar.util.WireMockTestResource;
+import ai.pipestream.test.support.SidecarWireMockTestResource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * The WireMock server has default test documents registered that can be hydrated.
  */
 @QuarkusTest
-@QuarkusTestResource(WireMockTestResource.class)
+@QuarkusTestResource(SidecarWireMockTestResource.class)
 class DocumentHydratorTest {
 
     @Inject

@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Test-only factory overriding gRPC stub creation to ensure deterministic connectivity to WireMock.
  * <p>
- * Uses the Stork address-list populated by WireMockTestResource to build real ManagedChannels.
+ * Uses the Stork address-list populated by SidecarWireMockTestResource to build real ManagedChannels.
  */
 @Alternative
 @Priority(1)
