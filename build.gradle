@@ -105,6 +105,7 @@ java {
 test {
     maxHeapSize = "8g"
     systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
+    systemProperty "pipestream.wiremock.image", "docker.io/pipestreamai/pipestream-wiremock-server:0.1.30"
 
     // Required for JDK 24+ with jboss-threads
     jvmArgs '--add-opens', 'java.base/java.lang=ALL-UNNAMED'
