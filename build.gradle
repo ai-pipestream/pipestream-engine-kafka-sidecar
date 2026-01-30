@@ -66,6 +66,7 @@ dependencies {
     implementation 'ai.pipestream:pipestream-quarkus-devservices'
     implementation 'ai.pipestream:quarkus-dynamic-grpc'
     implementation 'ai.pipestream:pipestream-service-registration'
+    implementation 'ai.pipestream:pipestream-server'
 
     // Protobuf JSON utilities
     implementation 'com.google.protobuf:protobuf-java-util'
@@ -77,7 +78,7 @@ dependencies {
     testImplementation platform("ai.pipestream:pipestream-bom:${pipestreamBomVersion}")
     testImplementation 'io.quarkus:quarkus-junit5'
     testImplementation 'io.rest-assured:rest-assured'
-    testImplementation(testFixtures("ai.pipestream:pipestream-test-support:${pipestreamBomVersion}"))
+    testImplementation("ai.pipestream:pipestream-test-support:${pipestreamBomVersion}")
     // Testcontainers for running pipestream-wiremock-server as a container
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
@@ -105,7 +106,6 @@ java {
 test {
     maxHeapSize = "8g"
     systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
-    systemProperty "pipestream.wiremock.image", "docker.io/pipestreamai/pipestream-wiremock-server:0.1.30"
 
     // Required for JDK 24+ with jboss-threads
     jvmArgs '--add-opens', 'java.base/java.lang=ALL-UNNAMED'

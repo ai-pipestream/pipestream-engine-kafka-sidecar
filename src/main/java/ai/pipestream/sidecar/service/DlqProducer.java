@@ -74,6 +74,8 @@ public class DlqProducer {
         config.put("apicurio.registry.url", registryUrl);
         config.put("apicurio.registry.auto-register", "true");
         config.put("apicurio.protobuf.derive.class", "true");
+        ConfigProvider.getConfig().getOptionalValue("apicurio.registry.use-id", String.class)
+            .ifPresent(value -> config.put("apicurio.registry.use-id", value));
 
         producer = KafkaProducer.create(vertx, config);
     }
