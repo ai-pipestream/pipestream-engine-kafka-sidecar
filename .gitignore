@@ -1,6 +1,9 @@
 .gradle
 **/build/
 !**/src/**/build/
+.quarkus
+.claude
+.idea
 
 # Ignore Gradle GUI config
 gradle-app.setting
@@ -22,4 +25,3 @@ gradle-app.setting
 bin
 .dev-helpers
 *.iml
-.idea

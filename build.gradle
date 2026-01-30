@@ -81,7 +81,7 @@ dependencies {
     testImplementation("ai.pipestream:pipestream-test-support:${pipestreamBomVersion}")
     // Testcontainers for running pipestream-wiremock-server as a container
     testImplementation 'org.testcontainers:testcontainers'
-    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 
     // Micrometer for metrics
     implementation 'io.quarkus:quarkus-micrometer'
