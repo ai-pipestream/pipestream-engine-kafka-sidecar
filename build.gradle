@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.nmcp.single)
     alias(libs.plugins.axion.release)
     alias(libs.plugins.proto.toolchain)
+    id 'idea'  // IntelliJ IDEA integration
 }
 
 def pipestreamBomVersion = findProperty('pipestreamBomVersion')
