@@ -50,7 +50,6 @@ dependencies {
     implementation 'io.quarkus:quarkus-arc'
     implementation 'io.quarkus:quarkus-grpc'
     implementation 'io.grpc:grpc-services'
-    implementation 'io.quarkus:quarkus-smallrye-health'
 
     // Kafka Consumer with Protobuf serialization via Apicurio Registry
     implementation 'io.quarkus:quarkus-messaging-kafka'
