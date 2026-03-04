@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Kafka Sidecar Startup Script
-# Port: 38104 (Kafka Sidecar Service)
+# Port: 18104 (Kafka Sidecar Service)
 # This script helps start the kafka sidecar service in development mode
 # with proper environment variable detection and instance management.
 #
@@ -72,7 +72,7 @@ fi
 
 # Service configuration
 SERVICE_NAME="Kafka Sidecar"
-SERVICE_PORT="38104"
+SERVICE_PORT="18104"
 DESCRIPTION="Kafka consumer sidecar that hydrates documents and hands off to engine"
 
 # Check dependencies
@@ -93,9 +93,9 @@ export CONSUL_PORT="${CONSUL_PORT:-8500}"
 
 # Set Engine and RepoService connection (sidecar needs these)
 export ENGINE_HOST="${ENGINE_HOST:-localhost}"
-export ENGINE_PORT="${ENGINE_PORT:-38100}"
+export ENGINE_PORT="${ENGINE_PORT:-18100}"
 export REPO_SERVICE_HOST="${REPO_SERVICE_HOST:-localhost}"
-export REPO_SERVICE_PORT="${REPO_SERVICE_PORT:-38102}"
+export REPO_SERVICE_PORT="${REPO_SERVICE_PORT:-18102}"
 
 print_status "header" "Starting $SERVICE_NAME"
 print_status "info" "Port: $SERVICE_PORT"
@@ -124,8 +124,8 @@ print_status "info" "Starting $SERVICE_NAME in Quarkus dev mode..."
 print_status "info" "DevServices will automatically start: Kafka, Consul, etc."
 print_status "info" ""
 print_status "info" "NOTE: The sidecar requires these services to be running:"
-print_status "info" "  - Pipestream Engine (port 38100) - for document handoff"
-print_status "info" "  - Repository Service (port 38102) - for document hydration"
+print_status "info" "  - Pipestream Engine (port 18100) - for document handoff"
+print_status "info" "  - Repository Service (port 18102) - for document hydration"
 print_status "info" "  - Consul (port 8500) - for topic lease management"
 print_status "info" "  - Kafka (port 9094) - for message consumption"
 print_status "info" ""

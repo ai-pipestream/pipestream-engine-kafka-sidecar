@@ -11,7 +11,7 @@
 #
 # Then run the container using:
 #
-# docker run -i --rm -p 38104:38104 quarkus/pipestream-engine-kafka-sidecar-jvm
+# docker run -i --rm -p 18104:18104 quarkus/pipestream-engine-kafka-sidecar-jvm
 #
 # This image uses the `run-java.sh` script to run the application.
 ###
@@ -33,12 +33,12 @@ COPY --chown=185 build/quarkus-app/*.jar /deployments/
 COPY --chown=185 build/quarkus-app/app/ /deployments/app/
 COPY --chown=185 build/quarkus-app/quarkus/ /deployments/quarkus/
 
-EXPOSE 38104
+EXPOSE 18104
 USER 185
 
 # Health check using Quarkus health endpoint
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:38104/q/health || exit 1
+    CMD curl -f http://localhost:18104/q/health || exit 1
 
 ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"
