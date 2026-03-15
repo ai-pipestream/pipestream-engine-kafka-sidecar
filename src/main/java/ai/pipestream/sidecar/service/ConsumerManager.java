@@ -218,6 +218,20 @@ public class ConsumerManager {
     }
 
     /**
+     * Whether the Kafka consumer has been initialized and is ready.
+     */
+    public boolean isConsumerReady() {
+        return consumer != null;
+    }
+
+    /**
+     * Number of currently subscribed topics.
+     */
+    public int getSubscribedTopicCount() {
+        return subscribedTopics.size();
+    }
+
+    /**
      * Updates the Kafka consumer subscription to match subscribedTopics.
      */
     private void updateSubscription() {
